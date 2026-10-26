@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Trip Splitter</title><meta name="apple-mobile-web-app-title" content="Trip Splitter">
+<style>
+:root{color-scheme:light dark;--bg:#f6f5f2;--card:#fff;--tx:#1d1d1b;--mut:#76746d;--ac:#0f766e;--act:#fff;--bd:#e4e2dc;--bad:#c0392b;--ok:#15803d;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#141413;--card:#1f1f1d;--tx:#f0efe9;--mut:#9a978e;--ac:#2dd4bf;--act:#06201c;--bd:#33322e;--bad:#f08070;--ok:#4ade80}}
+:root[data-theme="dark"]{--bg:#141413;--card:#1f1f1d;--tx:#f0efe9;--mut:#9a978e;--ac:#2dd4bf;--act:#06201c;--bd:#33322e;--bad:#f08070;--ok:#4ade80}
+html,body{height:auto}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+#app{max-width:560px;margin:0 auto;padding:16px 16px 48px}
+h1{font-size:26px;margin:8px 0 14px}h3{margin:0 0 10px;font-size:17px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px;margin:0 0 10px}
+.m{color:var(--mut);font-size:13px}.bad{color:var(--bad)}.ok{color:var(--ok)}
+label{display:block;font-size:13px;color:var(--mut);margin:10px 0 4px}
+input,select,textarea{width:100%;box-sizing:border-box;font:inherit;font-size:16px;padding:10px;border:1px solid var(--bd);border-radius:10px;background:var(--bg);color:var(--tx)}
+input[type=checkbox]{width:auto}
+button{font:inherit;font-size:15px;border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:10px;padding:9px 14px;margin:6px 6px 0 0}
+button.pri{background:var(--ac);color:var(--act);border-color:var(--ac);font-weight:600}
+button.sm{padding:5px 10px;font-size:13px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.seg{display:flex;gap:0}.seg button{flex:1;margin:0;border-radius:0}.seg button:first-child{border-radius:10px 0 0 10px}.seg button:last-child{border-radius:0 10px 10px 0}.seg .on{background:var(--ac);color:var(--act);border-color:var(--ac)}
+.pr{display:grid;grid-template-columns:1fr 90px;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--bd)}
+.ck{display:flex;align-items:center;gap:8px;color:var(--tx);font-size:16px;margin:0}
+.chk{margin-top:10px;font-weight:600;font-size:14px}
+.chip{display:inline-block;background:var(--bg);border:1px solid var(--bd);border-radius:20px;padding:4px 10px;margin:0 6px 6px 0;font-size:14px}
+.chip i{font-style:normal;color:var(--mut);margin-left:6px}
+.tabs{display:flex;gap:8px;margin:10px 0}.tabs button{flex:1;margin:0}
+.top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.big{font-size:30px;font-weight:700}
+.line{display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--bd)}.line:last-child{border-bottom:0}
+.rt{display:flex;align-items:center;gap:8px;margin:6px 0}.rt input{width:110px}
+</style></head><body><div id="app"></div>
+<script>
+const C={"Singapore":"SGD","Malaysia":"MYR","Thailand":"THB","Indonesia":"IDR","Vietnam":"VND","Japan":"JPY","South Korea":"KRW","China":"CNY","Hong Kong":"HKD","Taiwan":"TWD","Philippines":"PHP","India":"INR","Cambodia":"KHR","Laos":"LAK","Sri Lanka":"LKR","Maldives":"MVR","Nepal":"NPR","Australia":"AUD","New Zealand":"NZD","United Kingdom":"GBP","Europe (Euro)":"EUR","Switzerland":"CHF","United States":"USD","Canada":"CAD","UAE":"AED","Turkey":"TRY","Other":"USD"};
+const CU=["USD","EUR","GBP","JPY","MYR","THB","IDR","VND","KRW","CNY","HKD","TWD","PHP","INR","AUD","NZD","CHF","CAD","AED","TRY","KHR","LAK","LKR","MVR","NPR"];
+let S=null;try{S=JSON.parse(localStorage.getItem("ts-cache"))}catch(e){}
+S=S&&S.trips?S:{trips:[]};
+const save=()=>{try{localStorage.setItem("ts-cache",JSON.stringify({trips:S.trips}))}catch(e){}};
+let V={t:null,tab:"exp",form:null,nw:false,bk:false,del:null};
+const $=s=>document.getElementById(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const f2=n=>(Math.round(n*100)/100).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+const num=v=>{const n=parseFloat(String(v).replace(/,/g,""));return isNaN(n)?0:n};
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const T=()=>S.trips.find(t=>t.id===V.t);
+let FB=(()=>{try{return localStorage.getItem("ts-fb")}catch(e){}})()||"https://split-calculator-dcf79-default-rtdb.asia-southeast1.firebasedatabase.app";
+const ok=()=>/^https:\/\/\S+$/.test(FB);
+const U=(id,p)=>FB.replace(/\/$/,"")+"/trips/"+id+(p?"/"+p:"")+".json";
+const encK=s=>encodeURIComponent(s).replace(/\./g,"%2E"),decK=decodeURIComponent;
+const arr=x=>x?(Array.isArray(x)?x:Object.values(x)).filter(Boolean):[];
+const rid=()=>Array.from(crypto.getRandomValues(new Uint8Array(12)),b=>(b%36).toString(36)).join("");
+const rq=(m,id,p,b)=>fetch(U(id,p),{method:m,body:b===undefined?undefined:JSON.stringify(b)}).then(r=>{if(!r.ok)throw 0;return r.json()});
+const rr=()=>{if(!V.form&&!V.nw)R()};
+const fail=()=>{V.err="Couldn’t save to the database. Check your connection.";rr()};
+const encE=e=>{const o={...e};delete o.id;o.split={};for(const p in e.split)o.split[encK(p)]=e.split[p];return o};
+const wExp=(t,e)=>rq("PUT",t.id,"exp/"+e.id,encE(e)).catch(fail);
+const dExp=(t,id)=>rq("DELETE",t.id,"exp/"+id).catch(fail);
+const wP=(t,n)=>rq("PUT",t.id,"people/"+encodeURIComponent(encK(n)),Date.now()).catch(fail);
+const dP=(t,n)=>rq("DELETE",t.id,"people/"+encodeURIComponent(encK(n))).catch(fail);
+const wR=(t,c,v)=>rq("PUT",t.id,"rates/"+c,String(v)).catch(fail);
+function norm(id,d){
+  const people=Object.entries(d.people||{}).sort((a,b)=>a[1]-b[1]).map(x=>decK(x[0]));
+  const exp=Object.entries(d.exp||{}).map(([k,e])=>{const sp={};for(const p in e.split||{})sp[decK(p)]=e.split[p];const o={...e,id:k,split:sp};if(e.items)o.items=arr(e.items).map(i=>({...i,who:arr(i.who)}));return o});
+  return{id,name:d.name,country:d.country,cur:d.cur,people,exp,rates:d.rates||{}};
+}
+async function pull(id){
+  if(V.form&&V.t===id){V.dirty=1;return}
+  try{const d=await rq("GET",id);if(!d)return;const t=norm(id,d),i=S.trips.findIndex(x=>x.id===id);
+    if(i>=0&&JSON.stringify(S.trips[i])===JSON.stringify(t)&&!V.err)return;
+    if(i<0)S.trips.push(t);else S.trips[i]=t;V.err=null;save();rr()}catch(e){}
+}
+const lv={};
+function live(id){if(lv[id])return;lv[id]=1;try{const es=new EventSource(U(id));let tm;const go=()=>{clearTimeout(tm);tm=setTimeout(()=>pull(id),250)};es.addEventListener("put",go);es.addEventListener("patch",go)}catch(e){}}
+async function join(c){
+  c=(c||"").trim().replace(/^.*#/,"");if(!c)return;
+  if(!/^[a-z0-9]{8,}$/.test(c)){V.err="That link doesn’t look right";return R()}
+  if(!S.trips.some(t=>t.id===c)){try{const d=await rq("GET",c);if(!d){V.err="Trip not found";return R()}S.trips.push(norm(c,d));save();live(c);V.err=null}catch(e){V.err="Couldn’t reach the database. Check your connection.";return R()}}
+  openT(c);
+}
+function boot(){if(!ok())return;S.trips.forEach(t=>{pull(t.id);live(t.id)});const h=location.hash.slice(1);if(h)join(h)}
+function setupH(){return `<h1>One-time setup</h1><div class="card"><div class="m">Paste your Firebase Realtime Database URL (it ends in firebasedatabase.app).</div><input id="fbu" placeholder="https://your-project-default-rtdb.…firebasedatabase.app"><div id="err" class="bad m"></div><button class="pri" onclick="setFB()">Save</button></div>`}
+function setFB(){const v=$("fbu").value.trim();if(!/^https:\/\/\S+$/.test(v))return $("err").textContent="That doesn’t look like a URL";try{localStorage.setItem("ts-fb",v)}catch(e){}FB=v;boot();R()}
+function shareH(t){return V.inv?`<div class="card"><div class="m">Send this link to the group. Anyone with it can see the trip and add expenses, no login needed.</div><input readonly onfocus="this.select()" value="${esc(location.href.split("#")[0]+"#"+t.id)}"></div>`:`<button class="sm" onclick="V.inv=1;R()">Invite link</button>`}
+const curs=t=>[...new Set(["SGD",t.cur,...CU])];
+const today=()=>new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,10);
+const sh=e=>{const tot=Object.values(e.split).reduce((a,b)=>a+b,0),o={};for(const p in e.split)o[p]=e.mode==="share"?e.amt*e.split[p]/tot:e.split[p];return o};
+function calc(F,t){const k=(1+num(F.svc)/100)*(1+num(F.gst)/100),sub={};let s=0;F.items.forEach(it=>{const a=num(it.amt),w=t.people.filter(p=>it.who[p]);if(!w.length)return;s+=a;w.forEach(p=>sub[p]=(sub[p]||0)+a/w.length)});return{k,sub,s,tot:s*k}}
+function itemsH(t,F){return F.items.map((it,k)=>`<div class="card" style="background:var(--bg);margin-top:10px"><div class="row" style="grid-template-columns:1fr 100px"><input id="in${k}" placeholder="Item, e.g. Spaghetti" value="${esc(it.name)}"><input id="ip${k}" inputmode="decimal" placeholder="price" value="${esc(it.amt)}" oninput="upd()"></div><div class="m" style="margin-top:8px">Shared equally by:</div><div>${t.people.map((p,i)=>`<label class="ck" style="display:inline-flex;margin:4px 12px 0 0;font-size:14px"><input type="checkbox" id="ic${k}_${i}" ${it.who[p]?"checked":""} onchange="upd()"> ${esc(p)}</label>`).join("")}</div><button class="sm" onclick="rmI(${k})">Remove item</button></div>`).join("")+`<button class="sm" onclick="addI()">+ Add item</button><div class="row"><div><label>Service charge %</label><input id="fs" inputmode="decimal" placeholder="e.g. 10" value="${esc(F.svc)}" oninput="upd()"></div><div><label>GST / tax % (on top of service)</label><input id="fg" inputmode="decimal" placeholder="e.g. 9" value="${esc(F.gst)}" oninput="upd()"></div></div>`}
+function addI(){col();const F=V.form;F.items.push({name:"",amt:"",who:Object.fromEntries(T().people.map(p=>[p,true]))});R()}
+function rmI(k){col();V.form.items.splice(k,1);R()}
+function saveI(t,F,er){const c=calc(F,t);if(F.items.some(it=>num(it.amt)>0&&!t.people.some(p=>it.who[p])))return er("Every item needs at least one person");const items=F.items.filter(it=>num(it.amt)>0).map(it=>({name:it.name.trim(),amt:num(it.amt),who:t.people.filter(p=>it.who[p])}));if(!items.length)return er("Add at least one item with a price");const total=Math.round(c.tot*100),split={};let sum=0;Object.keys(c.sub).forEach(p=>{split[p]=Math.round(c.sub[p]*c.k*100);sum+=split[p]});split[Object.keys(split)[0]]+=total-sum;Object.keys(split).forEach(p=>split[p]/=100);const e={id:F.id||uid(),note:F.note.trim(),amt:total/100,cur:F.cur,paid:F.paid,date:F.date||today(),mode:"items",split,items,svc:num(F.svc),gst:num(F.gst)};if(F.id)t.exp=t.exp.map(x=>x.id===F.id?e:x);else t.exp.unshift(e);wExp(t,e);V.form=null;save();R()}
+
+function R(){
+  const a=$("app");
+  if(!ok()){a.innerHTML=setupH();return}
+  if(!V.form&&V.t&&V.dirty){V.dirty=0;pull(V.t)}
+  a.innerHTML=(V.err?`<div class="card bad">${esc(V.err)}</div>`:"")+(V.nw?newH():V.t&&T()?tripH(T()):homeH());
+  if(V.form&&V.t&&!V.nw)upd();
+}
+function homeH(){
+  return `<h1>Trips</h1>`+(S.trips.map(t=>`<div class="card" onclick="openT('${t.id}')"><b>${esc(t.name)}</b><div class="m">${esc(t.country)} · ${t.people.length} people · ${t.exp.length} expenses</div></div>`).join("")||`<p class="m">No trips yet. Create one, or join with a link.</p>`)+
+  `<button class="pri" onclick="V.nw=true;R()">+ New trip</button><div class="row" style="grid-template-columns:1fr auto;margin-top:14px"><input id="jc" placeholder="Paste a trip link to join"><button style="margin:0" onclick="join($('jc').value)">Join</button></div>`;
+}
+function newH(){
+  return `<h1>New trip</h1><div class="card"><label>Trip name</label><input id="nn" placeholder="Bangkok Oct 2026">
+  <label>Country (sets the local currency)</label><select id="nc">${Object.keys(C).map(c=>`<option value="${esc(c)}">${esc(c)} (${C[c]})</option>`).join("")}</select>
+  <label>People (separate with commas)</label><textarea id="np" rows="2" placeholder="Evelyn, Sam, Alex"></textarea>
+  <div id="err" class="bad m"></div><button class="pri" onclick="mk()">Create</button><button onclick="V.nw=false;R()">Cancel</button></div>`;
+}
+async function mk(){
+  const name=$("nn").value.trim(),country=$("nc").value;
+  const ps=[...new Set($("np").value.split(/[,\n]/).map(s=>s.trim()).filter(Boolean))];
+  if(!name)return $("err").textContent="Give the trip a name";
+  if(!ps.length)return $("err").textContent="Add at least one person";
+  const id=rid(),people={};ps.forEach((p,i)=>people[encK(p)]=Date.now()+i);
+  try{await rq("PUT",id,"",{name,country,cur:C[country],people})}catch(e){return $("err").textContent="Couldn’t reach the database. Check the URL and rules."}
+  await pull(id);live(id);V.nw=false;openT(id);
+}
+function openT(id){V.t=id;V.tab="exp";V.form=null;V.del=null;R();window.scrollTo(0,0)}
+function tripH(t){
+  return `<div class="top"><button class="sm" onclick="V.t=null;V.form=null;R()">‹ Trips</button><span class="m">${esc(t.country)} · ${t.cur}</span></div>
+  <h1>${esc(t.name)}</h1>${shareH(t)}
+  <div class="tabs"><button class="${V.tab==="exp"?"pri":""}" onclick="tab('exp')">Expenses</button><button class="${V.tab==="sum"?"pri":""}" onclick="tab('sum')">Summary</button></div>`+
+  (V.tab==="sum"?sumH(t):V.form?formH(t):listH(t));
+}
+function tab(x){V.tab=x;V.form=null;R()}
+function listH(t){
+  const used=new Set();t.exp.forEach(e=>{used.add(e.paid);for(const p in e.split)used.add(p)});
+  const ex=[...t.exp].sort((a,b)=>b.date.localeCompare(a.date));
+  return `<div class="card"><h3>People</h3>${t.people.map((p,i)=>`<span class="chip">${esc(p)}${used.has(p)?"":`<i onclick="rmP(${i})">✕</i>`}</span>`).join("")}
+  <div class="row" style="grid-template-columns:1fr auto;margin-top:6px"><input id="pn" placeholder="Add person"><button style="margin:0" onclick="addP()">Add</button></div></div>
+  <button class="pri" style="width:100%;margin:0 0 10px" onclick="newX()">+ Add expense</button>`+
+  (ex.map(e=>{const s=sh(e);return `<div class="card"><div class="top"><b>${esc(e.note||"Expense")}</b><b>${e.cur} ${f2(e.amt)}</b></div>
+  <div class="m">Paid by ${esc(e.paid)} · ${e.date}</div>${e.mode==="items"?`<div class="m">${e.items.map(i=>`${esc(i.name||"Item")} ${f2(i.amt)} (${i.who.map(w=>esc(w)).join(", ")})`).join(" · ")}${e.svc||e.gst?` · Service ${e.svc||0}% + GST ${e.gst||0}%`:""}</div>`:""}<div class="m">${Object.keys(s).map(p=>`${esc(p)} ${f2(s[p])}`).join(" · ")}</div>
+  <button class="sm" onclick="editX('${e.id}')">Edit</button><button class="sm ${V.del===e.id?"bad":""}" onclick="delX('${e.id}')">${V.del===e.id?"Tap again to delete":"Delete"}</button></div>`}).join("")||`<p class="m">No expenses yet.</p>`)+
+  `<button class="sm ${V.del==="trip"?"bad":""}" style="margin-top:20px" onclick="delT()">${V.del==="trip"?"Tap again to remove":"Remove from this phone"}</button>`;
+}
+function addP(){const t=T(),v=$("pn").value.trim();if(v&&!t.people.includes(v)){t.people.push(v);wP(t,v)}R()}
+function rmP(i){const t=T(),n=t.people.splice(i,1)[0];dP(t,n);R()}
+function delX(id){const t=T();if(V.del===id){t.exp=t.exp.filter(e=>e.id!==id);dExp(t,id);V.del=null}else V.del=id;R()}
+function delT(){if(V.del==="trip"){S.trips=S.trips.filter(x=>x.id!==V.t);V.t=null;V.del=null;save()}else V.del="trip";R()}
+function newX(){const t=T();V.form={id:null,note:"",amt:"",cur:t.cur,paid:t.people[0],date:today(),mode:"share",part:Object.fromEntries(t.people.map(p=>[p,true])),val:{},items:[],svc:"",gst:""};R()}
+function editX(id){const e=T().exp.find(x=>x.id===id);V.form={id:e.id,note:e.note,amt:String(e.amt),cur:e.cur,paid:e.paid,date:e.date,mode:e.mode,part:Object.fromEntries(Object.keys(e.split).map(p=>[p,true])),val:Object.fromEntries(Object.entries(e.split).map(([p,v])=>[p,String(v)])),items:(e.items||[]).map(x=>({name:x.name,amt:String(x.amt),who:Object.fromEntries(x.who.map(p=>[p,true]))})),svc:e.svc?String(e.svc):"",gst:e.gst?String(e.gst):""};R()}
+function formH(t){
+  const F=V.form,ex=F.mode==="exact",it=F.mode==="items";
+  return `<div class="card"><h3>${F.id?"Edit":"New"} expense</h3>
+  <label>Description (optional)</label><input id="fn" value="${esc(F.note)}">
+  <div class="row"><div><label>${it?"Total (auto)":"Amount"}</label><input id="fa" inputmode="decimal" value="${esc(F.amt)}" ${it?"disabled":""} oninput="upd()"></div>
+  <div><label>Currency</label><select id="fc" onchange="upd()">${curs(t).map(c=>`<option ${c===F.cur?"selected":""}>${c}</option>`).join("")}</select></div></div>
+  <div class="row"><div><label>Paid by</label><select id="fp">${t.people.map(p=>`<option ${p===F.paid?"selected":""}>${esc(p)}</option>`).join("")}</select></div>
+  <div><label>Date</label><input type="date" id="fd" value="${F.date}"></div></div>
+  <label>Split</label><div class="seg"><button class="${ex||it?"":"on"}" onclick="setM('share')">Shares</button><button class="${ex?"on":""}" onclick="setM('exact')">Amounts</button><button class="${it?"on":""}" onclick="setM('items')">Itemised</button></div>
+  ${it?itemsH(t,F):t.people.map((p,i)=>`<div class="pr"><div><label class="ck"><input type="checkbox" id="c${i}" ${F.part[p]?"checked":""} onchange="tg()"> ${esc(p)}</label><div class="m" id="s${i}"></div></div>
+  <input id="v${i}" inputmode="decimal" placeholder="${ex?"amount":"shares"}" value="${esc(F.val[p]??(ex?"":"1"))}" ${F.part[p]?"":"disabled"} oninput="upd()"></div>`).join("")}
+  <div id="chk" class="chk"></div>${ex?`<button class="sm" onclick="fillEq()">Split total equally</button>`:""}
+  <div id="err" class="bad m" style="margin-top:8px"></div>
+  <button class="pri" onclick="saveX()">Save</button><button onclick="V.form=null;R()">Cancel</button></div>`;
+}
+function col(){const t=T(),F=V.form;F.note=$("fn").value;F.cur=$("fc").value;F.paid=$("fp").value;F.date=$("fd").value;if(F.mode==="items"){F.items.forEach((it,k)=>{it.name=$("in"+k).value;it.amt=$("ip"+k).value;t.people.forEach((p,i)=>{it.who[p]=$("ic"+k+"_"+i).checked})});F.svc=$("fs").value;F.gst=$("fg").value}else{F.amt=$("fa").value;t.people.forEach((p,i)=>{F.part[p]=$("c"+i).checked;F.val[p]=$("v"+i).value})}}
+function setM(m){col();const F=V.form;F.mode=m;F.val={};if(m==="items"&&!F.items.length)F.items=[{name:"",amt:"",who:Object.fromEntries(T().people.map(p=>[p,true]))}];R()}
+function tg(){col();R()}
+function fillEq(){col();const t=T(),F=V.form,ps=t.people.filter(p=>F.part[p]);if(!ps.length)return;const a=num(F.amt),each=Math.floor(a/ps.length*100)/100;let rem=Math.round((a-each*ps.length)*100);ps.forEach(p=>{F.val[p]=String(Math.round((each+(rem-->0?0.01:0))*100)/100)});R()}
+function upd(){
+  const t=T(),F=V.form;if(!F||!$("fa"))return;
+  if(F.mode==="items"){col();const c=calc(F,t),sv=c.s*num(F.svc)/100,gs=(c.s+sv)*num(F.gst)/100;F.amt=(Math.round(c.tot*100)/100).toFixed(2);$("fa").value=F.amt;const k=$("chk");k.className="chk";k.innerHTML=`<div class="line"><span>Subtotal</span><span>${f2(c.s)}</span></div><div class="line"><span>Service ${num(F.svc)}%</span><span>${f2(sv)}</span></div><div class="line"><span>GST / tax ${num(F.gst)}%</span><span>${f2(gs)}</span></div><div class="line"><b>Total ${F.cur}</b><b>${f2(c.tot)}</b></div><div class="m" style="margin-top:6px">${t.people.filter(p=>c.sub[p]).map(p=>`${esc(p)} ${f2(c.sub[p]*c.k)}`).join(" · ")}</div>`;return}
+  const amt=num($("fa").value),cur=$("fc").value,ex=F.mode==="exact";let tot=0,n=0;
+  const vs=t.people.map((p,i)=>{const on=$("c"+i).checked;$("v"+i).disabled=!on;if(!on)return null;const v=num($("v"+i).value);tot+=v;n++;return v});
+  t.people.forEach((p,i)=>{$("s"+i).textContent=vs[i]==null||ex?"":"= "+f2(tot?amt*vs[i]/tot:0)+" "+cur});
+  const c=$("chk");
+  if(ex){const d=Math.round((amt-tot)*100)/100;
+    if(!(amt>0)){c.className="chk m";c.textContent="Enter the total amount first"}
+    else if(d===0){c.className="chk ok";c.textContent="Adds up ✓ "+f2(tot)+" "+cur}
+    else{c.className="chk bad";c.textContent=(d>0?"Short by ":"Over by ")+f2(Math.abs(d))+" "+cur+" (entered "+f2(tot)+" of "+f2(amt)+")"}}
+  else{c.className="chk m";c.textContent=n?n+" selected · "+f2(tot)+" shares in total":"Select who shares this"}
+}
+function saveX(){
+  col();const t=T(),F=V.form,amt=num(F.amt),ps=t.people.filter(p=>F.part[p]),er=m=>{$("err").textContent=m};
+  if(F.mode==="items")return saveI(t,F,er);
+  if(!(amt>0))return er("Enter an amount");if(!ps.length)return er("Select at least one participant");
+  const split={};let tot=0;ps.forEach(p=>{split[p]=num(F.val[p]);tot+=split[p]});
+  if(F.mode==="exact"){if(Math.round((amt-tot)*100)!==0)return er("Amounts don’t add up to the total")}
+  else if(!(tot>0))return er("Shares must be above zero");
+  const e={id:F.id||uid(),note:F.note.trim(),amt,cur:F.cur,paid:F.paid,date:F.date||today(),mode:F.mode,split};
+  if(F.id)t.exp=t.exp.map(x=>x.id===F.id?e:x);else t.exp.unshift(e);wExp(t,e);
+  V.form=null;save();R();
+}
+function setR(c,v){const t=T();t.rates[c]=v;wR(t,c,v);R()}
+function sumH(t){
+  const used=[...new Set(t.exp.map(e=>e.cur))],rate=c=>c==="SGD"?1:num(t.rates[c]);
+  const miss=used.filter(c=>!(rate(c)>0)),bal={},byC={};let tot=0;
+  t.people.forEach(p=>bal[p]=0);
+  t.exp.forEach(e=>{byC[e.cur]=(byC[e.cur]||0)+e.amt;const r=rate(e.cur);if(!(r>0))return;tot+=e.amt*r;bal[e.paid]+=e.amt*r;const s=sh(e);for(const p in s)bal[p]-=s[p]*r});
+  const cr=[],db=[];
+  for(const p in bal){const b=Math.round(bal[p]*100)/100;if(b>0)cr.push([p,b]);else if(b<0)db.push([p,-b])}
+  cr.sort((a,b)=>b[1]-a[1]);db.sort((a,b)=>b[1]-a[1]);
+  const st=[];let i=0,j=0;
+  while(i<cr.length&&j<db.length){const x=Math.min(cr[i][1],db[j][1]);if(x>=0.01)st.push([db[j][0],cr[i][0],x]);cr[i][1]=Math.round((cr[i][1]-x)*100)/100;db[j][1]=Math.round((db[j][1]-x)*100)/100;if(cr[i][1]<=0.004)i++;if(db[j][1]<=0.004)j++}
+  if(!t.exp.length)return `<p class="m">Add some expenses to see a summary.</p>`;
+  return `<div class="card"><div class="m">Total spend (SGD)</div><div class="big">S$ ${f2(tot)}</div>
+  ${Object.keys(byC).map(c=>`<div class="line"><span>Spent in ${c}</span><span>${f2(byC[c])}</span></div>`).join("")}</div>
+  ${used.some(c=>c!=="SGD")?`<div class="card"><h3>Exchange rates to SGD</h3>${used.filter(c=>c!=="SGD").map(c=>`<div class="rt">1 ${c} = <input inputmode="decimal" value="${esc(t.rates[c]||"")}" placeholder="rate" onchange="setR('${c}',this.value)"> SGD</div>`).join("")}
+  ${miss.length?`<div class="bad m">Set the rate for ${miss.join(", ")}. Those expenses are left out until you do.</div>`:""}</div>`:""}
+  <div class="card"><h3>Balances (SGD)</h3>${t.people.map(p=>{const b=Math.round(bal[p]*100)/100;return `<div class="line"><span>${esc(p)}</span><span class="${b>0?"ok":b<0?"bad":"m"}">${b>0?"gets back ":b<0?"owes ":""}${f2(Math.abs(b))}</span></div>`}).join("")}</div>
+  <div class="card"><h3>Who pays whom (SGD)</h3>${st.map(([a,b,x])=>`<div class="line"><span>${esc(a)} → ${esc(b)}</span><b>S$ ${f2(x)}</b></div>`).join("")||`<span class="m">All settled.</span>`}</div>`;
+}
+
+
+R();boot();setInterval(()=>{if(ok())S.trips.forEach(t=>pull(t.id))},20000);document.addEventListener("visibilitychange",()=>{if(!document.hidden&&ok())S.trips.forEach(t=>pull(t.id))});
+</script></body></html>
